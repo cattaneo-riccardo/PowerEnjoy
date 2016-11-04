@@ -231,10 +231,8 @@ fact carAvailableCondition {
 	all c: Car |
 		c.available = True
 		iff
-		(all res: Reservation |
-			res.car = c
-			implies
-			isOpen[res]
+		(not some res: Reservation |
+			res.car = c and isOpen[res]
 		)
 }
 
