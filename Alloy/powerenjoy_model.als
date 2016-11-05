@@ -58,12 +58,9 @@ sig Ride {
 // Time and CurrentTime
 
 sig Time {
-//	day: Int,
 	hour: Int,
 	minute: Int
 } {
-//	day >= 0
-//	day =< 60 // For efficiency reasons
 	hour >= 0
 	hour =< 23
 	minute >= 0
@@ -80,18 +77,14 @@ sig Location {
 }
 sig Area {  
 	center: Location,
-	radius: Int
+//	radius: Int
 } {
-	radius > 0 
+//	radius > 0 
 }
 sig Safe_Area extends Area {}
 sig Special_Safe_Area extends Safe_Area {}
 
 /* ----------- Functions ------------ */
-fun minutesDifference[t, t': Time]: Int {
-	add[sub[60, t'.minute], t.minute]
-}
-
 fun minutesDiff[t, t': Time]:Int {
 	t.minute>t'.minute
 	implies
@@ -118,67 +111,65 @@ fun cost[t, t': Time]: Int {
 		else (
 			t.hour>t'.hour
 			implies(
-				add[add[sub[60, t.minute]	, mul[sub[hoursDiff[t,t'], 1], 60]], t'.minute]   //(60-t.minute) + (t.hour-t'.hour-1)*60 + t'.minute
+				add[add[sub[60, t'.minute], mul[sub[hoursDiff[t,t'], 1], 60]], t.minute]   //(60-t'.minute) + (t'.hour-t.hour-1)*60 + t.minute
 			)
 			else(
-				add[add[sub[60, t'.minute]	, mul[sub[hoursDiff[t,t'], 1], 60]], t.minute]   //(60-t'.minute) + (t'.hour-t.hour-1)*60 + t.minute			
+				add[add[sub[60, t.minute], mul[sub[hoursDiff[t,t'], 1], 60]], t'.minute]   //(60-t.minute) + (t.hour-t'.hour-1)*60 + t'.minute			
 			)
 		)
 }
 // ----------- Predicates -----------
 
-// Returns true if t - t' <= 1h
-
-pred isLessThanOneHourAhead[t, t': Time] {
-	areEqual[t, t']
-	or
-//	(t.day = t'.day
-//		implies (
-			(t.hour = t'.hour and t.minute > t'.minute)
-			or
-			(t.hour = add[t'.hour,1] and minutesDifference[t, t'] < 60)
-/*		)
-		else (
-			(t.day = add[t'.day, 1] and t.hour = 0 and t'.hour = 23 and minutesDifference[t, t'] < 60)
-		)
-	)*/
-}
-
-// Returns true if t >= t'
-
-pred comesAfterOrEqual[t, t': Time] {
-//	t.day = t'.day
-//	implies (
-		t.hour = t'.hour
-		implies t.minute >= t'.minute
-		else t.hour >= t'.hour
-//	)
-//	else t.day >= t'.day
-}
-
 // Returns true if t == t'
-
 pred areEqual[t, t': Time] {
-//	t.day = t'.day and 
 	t.hour = t'.hour and t.minute = t'.minute
 }
 
-// Returns true if the max distance between latitudes and longitudes is 5
-
-pred isNear[l, l': Location] {
-	(l.latitude >= l'.latitude implies 
-		sub[l.latitude, l'.latitude] <= 5
-	else
-		sub[l'.latitude, l.latitude] <= 5)
-	and
-	(l.longitude >= l'.longitude implies 
-		sub[l.longitude, l'.longitude] <= 5
-	else
-		sub[l'.longitude, l.longitude] <= 5)
+// Returns true if t - t' <= 1h
+pred isLessThanOneHourAhead[t, t': Time] {
+	areEqual[t, t']
+	or
+		(t.hour = t'.hour and t.minute > t'.minute)
+	or
+		(t.hour = add[t'.hour,1] and add[sub[60, t'.minute], t.minute] < 60)
 }
 
-// Reservation r is open <=> r is not expired and "it has not a ride yet or its ride has no release_time"
+// Returns true if t >= t'
+pred comesAfterOrEqual[t, t': Time] {
+		t.hour = t'.hour
+		implies t.minute >= t'.minute
+		else t.hour >= t'.hour
+}
 
+// Returns true if the max distance between latitudes and longitudes is 5
+pred isNear[l, l': Location] {
+	(l.latitude >= l'.latitude implies 
+		sub[l.latitude, l'.latitude] <= 4
+	else
+		sub[l'.latitude, l.latitude] <= 4)
+	and
+	(l.longitude >= l'.longitude implies 
+		sub[l.longitude, l'.longitude] <= 4
+	else
+		sub[l'.longitude, l.longitude] <= 4)
+}
+
+pred isFarFromSpecialSafeArea[area: Safe_Area] {
+			all ssa: Special_Safe_Area |(
+			(int ssa.location.latitude >= int area.location.latitude
+			implies 
+				sub[ssa.location.latitude, area.location.latitude] > 15
+			else
+				sub[area.location.latitude, ssa.location.latitude] > 15
+			)
+			and
+			(int ssa.location.longitude >= int area.location.longitude implies 
+				sub[ssa.location.longitude, area.location.longitude] > 15
+			else
+				sub[area.location.longitude, ssa.location.longitude] > 15)
+	)
+}
+// Reservation r is open <=> r is not expired and "it has not a ride yet or its ride has no release_time"
 pred isActive[r: Reservation] {
 	r.expired = False and (
 		no r.ride
@@ -190,13 +181,16 @@ pred isActive[r: Reservation] {
 // ----------- Facts -------------
 
 // There's only a current time
-
 fact currentTimeForeverAlone {
 	#CurrentTime = 1
 }
 
-// CurrentTime is after all the times in the model
+//There are no different Time with the same time
+/*fact alwaysDifferent {
+	all t, t': Time | t!=t' implies (not areEqual[t, t'])
+}*/
 
+// CurrentTime is after all the times in the model
 fact currentTimeIsAlwaysAhead {
 	all t: Time |
 		all ct: CurrentTime |
@@ -204,7 +198,6 @@ fact currentTimeIsAlwaysAhead {
 }
 
 // Each credential/password/payment info is used for a user
-
 fact eachCredentialCorrespondToAUser {
 	User.credential=Credential
 }
@@ -214,7 +207,6 @@ fact eachPaymentInfoCorrespondToAUser {
 }
 
 // Different users <=> different credentials
-
 fact noUsersWithSameCredentials {
 	all u1, u2: User |
 		u1 != u2
@@ -223,7 +215,6 @@ fact noUsersWithSameCredentials {
 }
 
 // Different cars <=> different IDs
-
 fact noCarsWithSameIDs {
 	all c1, c2: Car |
 		c1 != c2
@@ -270,20 +261,19 @@ fact carsCanBeReservedByOneUserAtOnce {
 	)
 }
 
-// A car is available if it has no reservations open.
-
+// A car is available if it has no reservations open and has enough battery
 fact carAvailableCondition {
 	all c: Car |
 		c.available = True
 		iff
 		(no res: Reservation |
 			res.car = c and isActive[res]
+			and c.battery_level>80
 		)
 }
 
 // A reservation is expired if there's is not a ride whose pickup_time is less than one hour after the 
 //    reservation start_time.
-
 fact reservationExpiredCondition {
 	all res: Reservation |
 		res.expired = True
@@ -296,7 +286,6 @@ fact reservationExpiredCondition {
 }
 
 // The pickup time of a ride should be in one hour from its reservation start_time
-
 fact pickupTimeConstraint {
 	all rid: Ride | (
 		isLessThanOneHourAhead[rid.pickup_time, rid.reservation.start_time]
@@ -304,7 +293,6 @@ fact pickupTimeConstraint {
 }
 
 // release_time is always after pickup_time
-
 fact releaseTimeIsAfterPickupTime {
 	all rid: Ride | (
 		no rid.release_time
@@ -317,7 +305,6 @@ fact releaseTimeIsAfterPickupTime {
 //    such user is near it and
 //    he hasn't finished the ride (the ride associated with that reservation 
 //    doesn't have a release_time).
-
 fact carUnlockedConstraint {
 	all c: Car | (
 		c.unlocked = True
@@ -346,7 +333,7 @@ fact feeConstraint {
 }
 
 //The actual cost of a reservation is proportional to minutes spent in the car
-fact costOfAReservation {
+fact costOfAReservationConstraint {
 	all res: Reservation | (
 		res.expired = False
 		implies (
@@ -362,6 +349,46 @@ fact costOfAReservation {
 				else
 					res.current_cost=cost[res.ride.release_time, res.ride.pickup_time]
 			)
+		)
+	)
+}
+
+//Passengers discount of 10%
+fact passengersDiscount{
+	all res: Reservation | (
+		res.expired = False and one res.ride.release_time and res.ride.passengers>2
+		implies(
+			res.final_discharged_cost=div[mul[res.current_cost, 9],10]
+		)
+	)
+}
+
+//Non-empty battery discount of 20%
+fact passengersDiscount{
+	all res: Reservation | (
+		res.expired = False and res.ride.release_battery_level>=50
+		implies(
+			res.final_discharged_cost=div[mul[res.current_cost, 4],5]
+		)
+	)
+}
+
+//Car released charging discount of 30%
+fact passengersDiscount{
+	all res: Reservation | (
+		res.expired = False and (res.ride.release_area in Special_Safe_Area) and release_plugged = True
+		implies(
+			res.final_discharged_cost=div[mul[res.current_cost, 7],10]
+		)
+	)
+}
+
+//Car released far and with low battery extra-charging of 30%
+fact passengersDiscount{
+	all res: Reservation | (
+		res.expired = False and res.ride.release_battery_level<20 and isFarFromSpecialSafeArea[res.ride.release_area]
+		implies(
+			res.final_discharged_cost=div[mul[res.current_cost, 13],10]
 		)
 	)
 }
@@ -401,18 +428,14 @@ assert falseByPurpose {
 
 pred show {
 	#User = 1
-	all r: Reservation | r.expired = False
-	#User = 1
-	#Car = 2
-	#Reservation = 3
+	#Reservation = 1
+	all r: Reservation | ((one r.ride.release_time) and r.ride.passengers>=3) 
 //	some c: Car | c.unlocked = True
 //	some c: Car | c.unlocked = False
 
 }
 
-//run show for 8 Int
-
-run show for 7 Int
+run show for 8 Int
 //check availableEntailsLocked for 7 Int
 //check unlockedEntailsNotAvailable for 7 Int
 //check expiredEntailsNoRide for 7 Int
