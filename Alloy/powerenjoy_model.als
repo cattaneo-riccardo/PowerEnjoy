@@ -9,19 +9,18 @@ sig Car {
 	unlocked: Bool,
 	battery_level: Int
 } {
-	int id>0
+	id>0
 	battery_level >= 0
-	battery_level <= 100
+	battery_level <= 10
 }
 
 sig User {
 	credential: Credential,
-	password: Password,
 	payment_info: Payment_Info,
 	location: Location
 }
 sig Credential {}
-sig Password {}
+
 sig Payment_Info {}
 
 // Reservation, Ride
@@ -31,8 +30,13 @@ sig Reservation {
 	car: Car,
 	start_area: Safe_Area,
 	start_time: Time,
+	current_cost: Int,
+	final_discharged_cost: lone Int,
 	expired: Bool,
 	ride: lone Ride
+} {
+	current_cost >= 0
+	final_discharged_cost >= 0
 }
 
 sig Ride {
@@ -41,23 +45,25 @@ sig Ride {
 	pickup_time: Time,
 	release_time: lone Time,
 	release_battery_level: lone Int,
-	release_area: lone Safe_Area
+	release_area: lone Safe_Area,
+	release_plugged: lone Bool
 } {
 	passengers >= 1
 	passengers <= 4
 	release_battery_level >= 0
-	release_battery_level <= 100
+	release_battery_level <= 10
+	not areEqual[pickup_time, release_time]
 }
 
 // Time and CurrentTime
 
 sig Time {
-	day: Int,
+//	day: Int,
 	hour: Int,
 	minute: Int
 } {
-	day >= 0
-	day =< 365
+//	day >= 0
+//	day =< 60 // For efficiency reasons
 	hour >= 0
 	hour =< 23
 	minute >= 0
@@ -72,7 +78,7 @@ sig Location {
 	latitude: Int, 
 	longitude: Int 
 }
-sig Area {
+sig Area {  
 	center: Location,
 	radius: Int
 } {
@@ -81,8 +87,44 @@ sig Area {
 sig Safe_Area extends Area {}
 sig Special_Safe_Area extends Safe_Area {}
 
-// ----------- Functions ------------
+/* ----------- Functions ------------ */
+fun minutesDifference[t, t': Time]: Int {
+	add[sub[60, t'.minute], t.minute]
+}
 
+fun minutesDiff[t, t': Time]:Int {
+	t.minute>t'.minute
+	implies
+		sub[t.minute, t'.minute]
+	else
+		sub[t'.minute, t.minute]
+}
+
+fun hoursDiff[t, t': Time]: Int {
+	t.hour>=t'.hour
+	implies(
+		sub[t.hour, t'.hour]
+	) else (
+		sub[t'.hour, t.hour]
+	)
+}
+
+//Return the cost for a ride from time t to time t'
+fun cost[t, t': Time]: Int {
+		t.hour = t'.hour
+		implies (
+			minutesDiff[t, t']
+		)
+		else (
+			t.hour>t'.hour
+			implies(
+				add[add[sub[60, t.minute]	, mul[sub[hoursDiff[t,t'], 1], 60]], t'.minute]   //(60-t.minute) + (t.hour-t'.hour-1)*60 + t'.minute
+			)
+			else(
+				add[add[sub[60, t'.minute]	, mul[sub[hoursDiff[t,t'], 1], 60]], t.minute]   //(60-t'.minute) + (t'.hour-t.hour-1)*60 + t.minute			
+			)
+		)
+}
 // ----------- Predicates -----------
 
 // Returns true if t - t' <= 1h
@@ -90,34 +132,35 @@ sig Special_Safe_Area extends Safe_Area {}
 pred isLessThanOneHourAhead[t, t': Time] {
 	areEqual[t, t']
 	or
-	(t.day = t'.day
-		implies (
+//	(t.day = t'.day
+//		implies (
 			(t.hour = t'.hour and t.minute > t'.minute)
 			or
-			(t.hour = add[t'.hour,1] and add[sub[60, t'.minute], t.minute] < 60)
-		)
+			(t.hour = add[t'.hour,1] and minutesDifference[t, t'] < 60)
+/*		)
 		else (
-			(t.day = add[t'.day, 1] and t.hour = 0 and t'.hour = 23 and add[sub[60, t'.minute], t.minute] < 60)
+			(t.day = add[t'.day, 1] and t.hour = 0 and t'.hour = 23 and minutesDifference[t, t'] < 60)
 		)
-	)
+	)*/
 }
 
 // Returns true if t >= t'
 
 pred comesAfterOrEqual[t, t': Time] {
-	t.day = t'.day
-	implies (
+//	t.day = t'.day
+//	implies (
 		t.hour = t'.hour
 		implies t.minute >= t'.minute
 		else t.hour >= t'.hour
-	)
-	else t.day >= t'.day
+//	)
+//	else t.day >= t'.day
 }
 
 // Returns true if t == t'
 
 pred areEqual[t, t': Time] {
-	t.day = t'.day and t.hour = t'.hour and t.minute = t'.minute
+//	t.day = t'.day and 
+	t.hour = t'.hour and t.minute = t'.minute
 }
 
 // Returns true if the max distance between latitudes and longitudes is 5
@@ -134,9 +177,9 @@ pred isNear[l, l': Location] {
 		sub[l'.longitude, l.longitude] <= 5)
 }
 
-// Reservation r is open <=> r is expired and "it has not a ride yet or its ride has no release_time"
+// Reservation r is open <=> r is not expired and "it has not a ride yet or its ride has no release_time"
 
-pred isOpen[r: Reservation] {
+pred isActive[r: Reservation] {
 	r.expired = False and (
 		no r.ride
 		or
@@ -163,21 +206,11 @@ fact currentTimeIsAlwaysAhead {
 // Each credential/password/payment info is used for a user
 
 fact eachCredentialCorrespondToAUser {
-	all c: Credential |
-		some u: User |
-			u.credential = c
-}
-
-fact eachPasswordCorrespondToAUser {
-	all p: Password |
-		some u: User |
-			u.password = p
+	User.credential=Credential
 }
 
 fact eachPaymentInfoCorrespondToAUser {
-	all pi: Payment_Info |
-		 some u: User |
-			u.payment_info = pi
+	User.payment_info=Payment_Info
 }
 
 // Different users <=> different credentials
@@ -198,6 +231,18 @@ fact noCarsWithSameIDs {
 		c1.id != c2.id
 }
 
+// If a ride has a reservation, then that reservation has that ride.
+fact ridesAndReservationRelation {
+	all rid: Ride | (
+		rid = rid.reservation.ride
+	) and
+	all res: Reservation | (
+		one res.ride 
+		implies
+			res=res.ride.reservation
+	)
+}
+
 // There can't be two reservations made by the same user both open
 // COMMENT: Actually it's possible that a user makes a wrong reservation and he lets it expires, while he makes another one
 /*
@@ -212,7 +257,7 @@ fact noConsecutiveReservations {
 
 // There can't be two reservations r1 and r2 for the same car overlapping.
 
-fact carsCanBeReservedByOneUserAtOnce {
+fact carsCanBeReservedByOneUserAtOnce { 
 	all c: Car | (
 		all r, r': Reservation | (
 			(r.car = c and r'.car = c and r != r' and comesAfterOrEqual[r'.start_time, r.start_time])
@@ -231,15 +276,15 @@ fact carAvailableCondition {
 	all c: Car |
 		c.available = True
 		iff
-		(not some res: Reservation |
-			res.car = c and isOpen[res]
+		(no res: Reservation |
+			res.car = c and isActive[res]
 		)
 }
 
 // A reservation is expired if there's is not a ride whose pickup_time is less than one hour after the 
 //    reservation start_time.
 
-fact carExpiredCondition {
+fact reservationExpiredCondition {
 	all res: Reservation |
 		res.expired = True
 		iff
@@ -258,22 +303,14 @@ fact pickupTimeConstraint {
 	)
 }
 
-// If a reservation has a ride, then that ride has that reservation.
+// release_time is always after pickup_time
 
-fact ridesAndReservationRelation {
-	all res: Reservation | (
-		some res.ride
-		implies
-		res = res.ride.reservation
+fact releaseTimeIsAfterPickupTime {
+	all rid: Ride | (
+		no rid.release_time
+		or
+		comesAfterOrEqual[rid.release_time, rid.pickup_time]
 	)
-	/*
-	(all rid: Ride |
-		some res: Reservation |
-			rid.reservation = res and res.ride = rid)
-	(all res, res': Reservation |
-		res != res'
-		implies
-		res.ride != res'.ride)*/
 }
 
 // A car is unlocked if there's a reservation not expired between a user and that car,
@@ -286,56 +323,98 @@ fact carUnlockedConstraint {
 		c.unlocked = True
 		iff
 		some r: Reservation | (
-			r.car = c and isOpen[r] and isNear[c.location, r.user.location]
+			r.car = c and isActive[r] and isNear[c.location, r.user.location]
 		)
 	)
-/*
-	all c: Car | (
-		c.unlocked = True
-		iff (
-			some res: Reservation | (
-				res.car = c and res.expired = False and
-				some u: User | (
-					res.user = u and
-					isNear[u.location, c.location] and
-					(no res.ride or no res.ride.release_time)
+}
+
+//If there is a release time, there are also a release release_battery and a release_area
+fact releaseInfoConstraint{
+	all rid: Ride| (
+		one rid.release_time
+		iff
+		(one rid.release_battery_level and one rid.release_area and one rid.release_plugged)
+	)
+}
+
+fact feeConstraint {
+	all r: Reservation | (
+		r.expired = True
+		implies
+		r.current_cost = 10 and r.final_discharged_cost = 10
+	)
+}
+
+//The actual cost of a reservation is proportional to minutes spent in the car
+fact costOfAReservation {
+	all res: Reservation | (
+		res.expired = False
+		implies (
+			no res.ride
+			implies
+				res.current_cost=0
+			else(
+				no res.ride.release_time
+				implies(
+					all ct : CurrentTime |
+						res.current_cost=cost[ct, res.ride.pickup_time]
 				)
+				else
+					res.current_cost=cost[res.ride.release_time, res.ride.pickup_time]
 			)
 		)
 	)
-*/
 }
-
-// release_time is always after pickup_time
-
-fact releaseTimeIsAfterPickupTime {
-	all rid: Ride | (
-		no rid.release_time
-		or
-		comesAfterOrEqual[rid.release_time, rid.pickup_time]
-	)
-}
-
 // ------------- Assertions ---------------
 
 // car available => car locked
 
+assert availableEntailsLocked {
+	all c: Car | c.available = True implies c.unlocked = False
+}
+
 // car unlocked => car not available
+
+assert unlockedEntailsNotAvailable {
+	all c: Car | c.unlocked = True implies c.available = False
+}
+
+// reservation expired => no ride
+
+assert expiredEntailsNoRide {
+	all r: Reservation | r.expired = True implies no r.ride
+}
+
+// reservation active => car not available
+
+assert activeEntailsNotAvailable {
+	all r: Reservation | isActive[r] implies r.car.available = False
+}
+
+// FALSE
+
+assert falseByPurpose {
+	all r: Reservation | r.start_time = r.ride.release_time
+}
 
 // ------------ Show world! --------------
 
 pred show {
 	#User = 1
+	all r: Reservation | r.expired = False
+	#User = 1
 	#Car = 2
 	#Reservation = 3
-	some c: Car | c.unlocked = True
-	some c: Car | c.unlocked = False
-}
+//	some c: Car | c.unlocked = True
+//	some c: Car | c.unlocked = False
 
-pred checkUnlocked {
-	
 }
 
 //run show for 8 Int
-run show for 8 Int
-//check currentTimeIsAlwaysAhead for 8 Int
+
+run show for 7 Int
+//check availableEntailsLocked for 7 Int
+//check unlockedEntailsNotAvailable for 7 Int
+//check expiredEntailsNoRide for 7 Int
+//check activeEntailsNotAvailable for 7 Int
+//check falseByPurpose for 7 Int
