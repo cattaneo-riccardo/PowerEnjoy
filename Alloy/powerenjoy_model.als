@@ -1,7 +1,6 @@
 open util/boolean
 
-// Car, User
-
+//A car is avalable if it can be reserved from the PowerEnjoy application, it is unlocked if the user who reserved it is close to it or he is driving.
 sig Car {
 	id: Int,
 	available: Bool,
@@ -13,18 +12,18 @@ sig Car {
 	battery_level >= 0
 	battery_level <= 10
 }
-
+//location represents where the user actually is
 sig User {
 	credential: Credential,
 	payment_info: Payment_Info,
 	location: Location
 }
-sig Credential {}
 
+sig Credential {}
 sig Payment_Info {}
 
-// Reservation, Ride
-
+//current_cost shows how much is the actual cost of a ride, without any discout or extra charge
+//A reservation is expired if the user did not pick up the car within an hour. A fee is applied.
 sig Reservation {
 	user: User,
 	car: Car,
@@ -287,7 +286,14 @@ fact pickupTimeConstraint {
 		isLessThanOneHourAhead[rid.pickup_time, rid.reservation.start_time]
 	)
 }
-
+//If a user is driving the reserved car, the location of the user and the car are the same.
+fact userLocationSameAsCar{
+	all res: Reservation |(
+		(isActive[res] and one res.ride)
+		implies
+		(res.user.location = res.car.location)
+	)
+}
 // release_time is always after pickup_time
 fact releaseTimeIsAfterPickupTime {
 	all rid: Ride | (
@@ -459,15 +465,15 @@ pred show {
 	#Reservation = 2
 	#Ride=1
 	#Car=1	
-	some r: Reservation | (one r.ride.release_time) 
+	some r: Reservation | isActive[r]
 //	all rid: Ride | all ct: CurrentTime | rid.release_time!=ct
 //	some c: Car | c.unlocked = False
 
 }
 
-//run show for 8 Int
+run show for 8 Int
 //check availabilityAndLockingChecking for 8 Int
 //check activeEntailsNotAvailable for 8 Int
-check expiredEntailsNoRide for 8 Int
+//check expiredEntailsNoRide for 8 Int
 //check activeEntailsNotAvailable for 7 Int
 //check falseByPurpose for 8 Int
