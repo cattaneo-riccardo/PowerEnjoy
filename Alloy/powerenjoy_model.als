@@ -11,7 +11,7 @@ sig Car {
 } {
 	id>0
 	battery_level >= 0
-	battery_level <= 100
+	battery_level <= 10
 }
 
 sig User {
@@ -51,7 +51,7 @@ sig Ride {
 	passengers >= 1
 	passengers <= 4
 	release_battery_level >= 0
-	release_battery_level <= 100
+	release_battery_level <= 10
 	not areEqual[pickup_time, release_time]
 }
 
@@ -77,10 +77,8 @@ sig Location {
 }
 sig Area {  
 	center: Location,
-//	radius: Int
-} {
-//	radius > 0 
 }
+
 sig Safe_Area extends Area {}
 sig Special_Safe_Area extends Safe_Area {}
 
@@ -185,11 +183,6 @@ fact currentTimeForeverAlone {
 	#CurrentTime = 1
 }
 
-//There are no different Time with the same time
-/*fact alwaysDifferent {
-	all t, t': Time | t!=t' implies (not areEqual[t, t'])
-}*/
-
 // CurrentTime is after all the times in the model
 fact currentTimeIsAlwaysAhead {
 	all t: Time |
@@ -234,17 +227,14 @@ fact ridesAndReservationRelation {
 	)
 }
 
-// There can't be two reservations made by the same user both open
-// COMMENT: Actually it's possible that a user makes a wrong reservation and he lets it expires, while he makes another one
-/*
-fact noConsecutiveReservations {
-	all r, r': Reservation | (
-		r.user = r'.user
-		implies not (
-			isOpen[r] and isOpen[r']
-		)
+//A car can be released plugged only if it is released in a Special Safe Area
+fact pluggedOnlyInSafeArea{
+	all rid: Ride |(
+		rid.release_plugged=True
+		implies
+		(rid.release_area in Special_Safe_Area)
 	)
-}*/
+}
 
 // There can't be two reservations r1 and r2 for the same car overlapping.
 
@@ -260,7 +250,14 @@ fact carsCanBeReservedByOneUserAtOnce {
 		)
 	)
 }
-
+//A user can reserve a car only if it has a battery level grater than 80%
+fact carReservableCondition {
+	all r: Reservation | (
+		(no r.ride and r.expired=False)
+		implies
+		r.car.battery_level>8
+	)
+}
 // A car is available if it has no reservations open and has enough battery
 fact carAvailableCondition {
 	all c: Car |
@@ -268,7 +265,6 @@ fact carAvailableCondition {
 		iff(
 		(no res: Reservation |
 			res.car = c and isActive[res])
-		 and  c.battery_level>80
 		)
 }
 
@@ -315,6 +311,17 @@ fact carUnlockedConstraint {
 	)
 }
 
+//If a car is locked and not plugged to a power grid, its battery level is the same as it has been left after last ride
+fact batteryLevelConstraint{
+	all res: Reservation | (
+		(no res': Reservation | (res!=res' and res.car=res'.car and comesAfterOrEqual[res'.start_time, res.start_time]))
+		implies (
+			(res.ride.release_plugged=False and res.car.location=res.ride.release_area.location)
+			implies
+				res.ride.release_battery_level = res.car.battery_level
+		)
+	)
+}
 //If there is a release time, there are also a release release_battery and a release_area
 fact releaseInfoConstraint{
 	all rid: Ride| (
@@ -359,69 +366,82 @@ fact costOfAReservationConstraint {
 	)
 }
 
-//Passengers discount of 10%
-fact passengersDiscount{
+
+fact finalDischargedCostCalculation {
 	all res: Reservation | (
-		res.expired = False and one res.ride.release_time and res.ride.passengers>2
-		implies(
-			res.final_discharged_cost=div[mul[res.current_cost, 9],10]
+		(one res.ride.release_time and res.ride.passengers>2)         
+		implies(			 //Enabled to 10% discount
+			(res.expired = False and res.ride.release_battery_level>=5)
+			implies(		 //Enabled to 10%+20% discount
+				 (res.ride.release_plugged = True)
+				implies(  //Enablet to 10%+20%+30% discount
+					res.final_discharged_cost=div[mul[res.current_cost, 2],5]
+				)
+				else(       //Enabled to 10%+20% discount
+					res.final_discharged_cost=div[mul[res.current_cost, 7],10]
+				)
+			)
+			else(
+				(res.ride.release_plugged = True)
+				implies(  //Enablet to 10%+30% discount
+					res.final_discharged_cost=div[mul[res.current_cost, 3],5]
+				)
+				else(       //Enabled to 10% discount, but 30% extra charging
+					(isFarFromSpecialSafeArea[res.ride.release_area] and res.ride.release_battery_level<3)
+					implies (
+						res.final_discharged_cost=div[mul[res.current_cost, 6],5]
+					)
+					else(
+						res.final_discharged_cost=div[mul[res.current_cost, 9],10]
+					)
+				)
+			)
+		)
+		else(
+			(res.expired = False and res.ride.release_battery_level>=5)
+			implies(		 //Enabled to 20% discount
+				 (res.ride.release_plugged = True)
+				implies(  //Enablet to 20%+30% discount
+					res.final_discharged_cost=div[res.current_cost,2]
+				)
+				else(       //Enabled to 20% discount
+					res.final_discharged_cost=div[mul[res.current_cost, 4],5]
+				)
+			)
+			else(
+				(res.ride.release_plugged = True)
+				implies(  //Enablet to 30% discount
+					res.final_discharged_cost=div[mul[res.current_cost, 7],10]
+				)
+				else(       //There are no discounts
+					(isFarFromSpecialSafeArea[res.ride.release_area] and res.ride.release_battery_level<3)
+					implies ( //Extra-charging of 30%
+						res.final_discharged_cost=div[mul[res.current_cost, 13],10]
+					)
+					else( // No discounts orr extra-charging
+						res.final_discharged_cost=res.current_cost
+					)
+				)
+			)
 		)
 	)
 }
 
-//Non-empty battery discount of 20%
-fact nonEmptyBatteryDiscount{
-	all res: Reservation | (
-		res.expired = False and res.ride.release_battery_level>=50
-		implies(
-			res.final_discharged_cost=div[mul[res.current_cost, 4],5]
-		)
-	)
-}
-
-//Car released charging discount of 30%
-fact chargingDiscount{
-	all res: Reservation | (
-	res.expired = False and (res.ride.release_area in Special_Safe_Area) and res.ride.release_plugged = True
-		implies(
-			res.final_discharged_cost=div[mul[res.current_cost, 7],10]
-		)
-	)
-}
-
-//Car released far and with low battery extra-charging of 30%
-fact lowBatteryExtraFee{
-	all res: Reservation | (
-		res.expired = False and res.ride.release_battery_level<20 and isFarFromSpecialSafeArea[res.ride.release_area]
-		implies(
-			res.final_discharged_cost=div[mul[res.current_cost, 13],10]
-		)
-	)
-}
 // ------------- Assertions ---------------
-
-// car available => car locked
-
-assert availableEntailsLocked {
-	all c: Car | c.available = True implies c.unlocked = False
-}
-
-// car unlocked => car not available
-
-assert unlockedEntailsNotAvailable {
-	all c: Car | c.unlocked = True implies c.available = False
+assert availabilityAndLockingChecking {
+	all c: Car | ((c.available = True implies c.unlocked = False)			  // car available => car locked
+						and (c.unlocked = True implies c.available = False))	  // car unlocked => car not available
 }
 
 // reservation expired => no ride
-
 assert expiredEntailsNoRide {
-	all r: Reservation | r.expired = True implies no r.ride
+	all r: Reservation | r.expired = True implies (no r.ride and r.final_discharged_cost=10)
 }
 
-// reservation active => car not available
-
+// reservation active => car not available and there aren't any other active reservations for that car
 assert activeEntailsNotAvailable {
-	all r: Reservation | isActive[r] implies r.car.available = False
+	all r: Reservation | isActive[r] implies (r.car.available = False
+															and no r': Reservation | r'!=r and isActive[r'] and r.car=r'.car)
 }
 
 // FALSE
@@ -436,16 +456,18 @@ assert falseByPurpose {
 
 pred show {
 	#User = 1
-	#Reservation = 1
-	some r: Reservation | (r.ride.release_battery_level>=50) 
-	some c: Car | c.available = True
+	#Reservation = 2
+	#Ride=1
+	#Car=1	
+	some r: Reservation | (one r.ride.release_time) 
+//	all rid: Ride | all ct: CurrentTime | rid.release_time!=ct
 //	some c: Car | c.unlocked = False
 
 }
 
-run show for 8 Int
-//check availableEntailsLocked for 7 Int
-//check unlockedEntailsNotAvailable for 7 Int
-//check expiredEntailsNoRide for 7 Int
+//run show for 8 Int
+//check availabilityAndLockingChecking for 8 Int
+//check activeEntailsNotAvailable for 8 Int
+check expiredEntailsNoRide for 8 Int
 //check activeEntailsNotAvailable for 7 Int
 //check falseByPurpose for 8 Int
