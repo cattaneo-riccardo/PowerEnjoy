@@ -490,9 +490,9 @@ pred showReservationsTypes {
 	some r: Reservation | not isActive[r] and r.expired = False
 }
 
-check availabilityAndLockingChecking for 8 Int
-check activeEntailsNotAvailable for 8 Int
-check expiredEntailsNoRide for 8 Int
-run showCarLockedAndCarUnlocked for 8 Int
-run showCarAvailableAndCarNotAvailable for 8 Int
+//check availabilityAndLockingChecking for 8 Int
+//check activeEntailsNotAvailable for 8 Int
+//check expiredEntailsNoRide for 8 Int
+//run showCarLockedAndCarUnlocked for 8 Int
+//run showCarAvailableAndCarNotAvailable for 8 Int
 run showReservationsTypes for 8 Int
