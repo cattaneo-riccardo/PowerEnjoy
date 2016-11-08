@@ -54,8 +54,7 @@ sig Ride {
 	not areEqual[pickup_time, release_time]
 }
 
-// Time and CurrentTime
-
+// Time represents a generic moment of the day before the CurrentTime
 sig Time {
 	hour: Int,
 	minute: Int
@@ -65,11 +64,9 @@ sig Time {
 	minute >= 0
 	minute =< 59
 }
-
 sig CurrentTime extends Time {}
 
-// Location, Areas
-
+// Location represents a point in the geographic area. An Area represents a special location with some particular feature.
 sig Location {
 	latitude: Int, 
 	longitude: Int 
@@ -77,11 +74,13 @@ sig Location {
 sig Area {  
 	center: Location,
 }
-
+//A Safe Area is a place where a car can be left.
 sig Safe_Area extends Area {}
+//A Special Safe Area is a Safe Area with power grids, where an electric car can be left plugged-in and charging.
 sig Special_Safe_Area extends Safe_Area {}
 
 /* ----------- Functions ------------ */
+//Returns the absolute difference between minutes of two Times
 fun minutesDiff[t, t': Time]:Int {
 	t.minute>t'.minute
 	implies
@@ -89,7 +88,7 @@ fun minutesDiff[t, t': Time]:Int {
 	else
 		sub[t'.minute, t.minute]
 }
-
+//Returns the absolute difference between hours of two Times
 fun hoursDiff[t, t': Time]: Int {
 	t.hour>=t'.hour
 	implies(
@@ -99,7 +98,7 @@ fun hoursDiff[t, t': Time]: Int {
 	)
 }
 
-//Return the cost for a ride from time t to time t'
+//Returns the cost for a ride from time t to time t'
 fun cost[t, t': Time]: Int {
 		t.hour = t'.hour
 		implies (
@@ -115,7 +114,7 @@ fun cost[t, t': Time]: Int {
 			)
 		)
 }
-// ----------- Predicates -----------
+/* ----------- Predicates ----------- */
 
 // Returns true if t == t'
 pred areEqual[t, t': Time] {
@@ -138,7 +137,7 @@ pred comesAfterOrEqual[t, t': Time] {
 		else t.hour >= t'.hour
 }
 
-// Returns true if the max distance between latitudes and longitudes is 5
+// Returns true if the max distance between latitudes and longitudes is 4
 pred isNear[l, l': Location] {
 	(l.latitude >= l'.latitude implies 
 		sub[l.latitude, l'.latitude] <= 4
@@ -151,6 +150,7 @@ pred isNear[l, l': Location] {
 		sub[l'.longitude, l.longitude] <= 4)
 }
 
+// Returns true if the min distance between latitudes and longitudes is 15
 pred isFarFromSpecialSafeArea[area: Safe_Area] {
 			all ssa: Special_Safe_Area |(
 			(int ssa.center.latitude >= int area.center.latitude
@@ -166,6 +166,7 @@ pred isFarFromSpecialSafeArea[area: Safe_Area] {
 				sub[area.center.longitude, ssa.center.longitude] > 15)
 	)
 }
+
 // Reservation r is open <=> r is not expired and "it has not a ride yet or its ride has no release_time"
 pred isActive[r: Reservation] {
 	r.expired = False and (
@@ -214,7 +215,7 @@ fact noCarsWithSameIDs {
 		c1.id != c2.id
 }
 
-// If a ride has a reservation, then that reservation has that ride.
+// The relation between a Reservation and a Ride is bijective, if the Reservation already has it.
 fact ridesAndReservationRelation {
 	all rid: Ride | (
 		rid = rid.reservation.ride
@@ -236,7 +237,6 @@ fact pluggedOnlyInSafeArea{
 }
 
 // There can't be two reservations r1 and r2 for the same car overlapping.
-
 fact carsCanBeReservedByOneUserAtOnce { 
 	all c: Car | (
 		all r, r': Reservation | (
@@ -249,6 +249,7 @@ fact carsCanBeReservedByOneUserAtOnce {
 		)
 	)
 }
+
 //A user can reserve a car only if it has a battery level grater than 80%
 fact carReservableCondition {
 	all r: Reservation | (
@@ -257,6 +258,7 @@ fact carReservableCondition {
 		r.car.battery_level>8
 	)
 }
+
 // A car is available if it has no reservations open and has enough battery
 fact carAvailableCondition {
 	all c: Car |
@@ -267,8 +269,8 @@ fact carAvailableCondition {
 		)
 }
 
-// A reservation is expired if there's is not a ride whose pickup_time is less than one hour after the 
-//    reservation start_time.
+// A reservation is expired if there is not a ride whose pickup_time is less than one hour after the 
+//  reservation start_time.
 fact reservationExpiredCondition {
 	all res: Reservation |
 		res.expired = True
@@ -286,6 +288,7 @@ fact pickupTimeConstraint {
 		isLessThanOneHourAhead[rid.pickup_time, rid.reservation.start_time]
 	)
 }
+
 //If a user is driving the reserved car, the location of the user and the car are the same.
 fact userLocationSameAsCar{
 	all res: Reservation |(
@@ -294,6 +297,7 @@ fact userLocationSameAsCar{
 		(res.user.location = res.car.location)
 	)
 }
+
 // release_time is always after pickup_time
 fact releaseTimeIsAfterPickupTime {
 	all rid: Ride | (
@@ -304,8 +308,7 @@ fact releaseTimeIsAfterPickupTime {
 }
 
 // A car is unlocked if there's a reservation not expired between a user and that car,
-//    such user is near it and
-//    he hasn't finished the ride (the ride associated with that reservation 
+//    such user is near it and he hasn't finished the ride yet (the ride associated with that reservation 
 //    doesn't have a release_time).
 fact carUnlockedConstraint {
 	all c: Car | (
@@ -328,6 +331,7 @@ fact batteryLevelConstraint{
 		)
 	)
 }
+
 //If there is a release time, there are also a release release_battery and a release_area
 fact releaseInfoConstraint{
 	all rid: Ride| (
@@ -342,7 +346,7 @@ fact releaseInfoConstraint{
 		some rid.release_plugged)
 	)
 }
-
+//If a Reservation is expired without the user picked up the car, he/she has to pay a fee of 10.
 fact feeConstraint {
 	all r: Reservation | (
 		r.expired = True
@@ -372,7 +376,7 @@ fact costOfAReservationConstraint {
 	)
 }
 
-
+//The final discherged cost corresponds to the final current cost with a discount or an extra fee
 fact finalDischargedCostCalculation {
 	all res: Reservation | (
 		(one res.ride.release_time and res.ride.passengers>2)         
