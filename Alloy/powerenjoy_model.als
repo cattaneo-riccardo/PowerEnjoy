@@ -462,18 +462,33 @@ assert falseByPurpose {
 
 pred show {
 	#User = 1
-	#Reservation = 2
+	#Reservation = 1
 	#Ride=1
 	#Car=1	
 	some r: Reservation | isActive[r]
 //	all rid: Ride | all ct: CurrentTime | rid.release_time!=ct
 //	some c: Car | c.unlocked = False
-
 }
 
-run show for 8 Int
-//check availabilityAndLockingChecking for 8 Int
-//check activeEntailsNotAvailable for 8 Int
-//check expiredEntailsNoRide for 8 Int
-//check activeEntailsNotAvailable for 7 Int
-//check falseByPurpose for 8 Int
+pred showCarLockedAndCarUnlocked {
+	some c: Car | c.unlocked = False
+	some c: Car | c.unlocked = True
+}
+
+pred showCarAvailableAndCarNotAvailable {
+	some c: Car | c.available = False
+	some c: Car | c.available = True
+}
+
+pred showReservationsTypes {
+	some r: Reservation | r.expired = True
+	some r: Reservation | isActive[r]
+	some r: Reservation | not isActive[r] and r.expired = False
+}
+
+check availabilityAndLockingChecking for 8 Int
+check activeEntailsNotAvailable for 8 Int
+check expiredEntailsNoRide for 8 Int
+run showCarLockedAndCarUnlocked for 8 Int
+run showCarAvailableAndCarNotAvailable for 8 Int
+run showReservationsTypes for 8 Int
