@@ -73,6 +73,7 @@ sig Location {
 }
 sig Area {  
 	center: Location,
+	radius: Int
 }
 //A Safe Area is a place where a car can be left.
 sig Safe_Area extends Area {}
