@@ -260,7 +260,7 @@ fact carReservableCondition {
 	)
 }
 
-// A car is available if it has no reservations open and has enough battery
+// A car is available if it has no reservations open
 fact carAvailableCondition {
 	all c: Car |
 		c.available = True
