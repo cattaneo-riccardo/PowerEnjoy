@@ -13,6 +13,9 @@ The project includes five assignments:
 2. DD: Design Document
 3. ITPD: Integration Test Plan Document
 4. PP: Project Plan
+5. CI: Code Inspection
+
+The CI assignment has been performed on the *PartContentWrapper.java* file of Apache OFBiz 16.11.01.
 
 # Ok, let me see the documents
 
@@ -22,7 +25,7 @@ Document releases are in the *Releases* directory.
 
 This is a kind of table of contents of all our documents.
 
-1. RASD
+1. **RASD**
   1. Introduction
     1. Description of the given problem
     2. Goals
@@ -55,7 +58,7 @@ This is a kind of table of contents of all our documents.
     3. Worlds generated
   7. Future development
   8. Used tools
-2. DD
+2. **DD**
   1. Introduction
     1. Purpose
     2. Scope
@@ -78,7 +81,7 @@ This is a kind of table of contents of all our documents.
     1. UX diagrams
     2. Mockups
   6. Requirements Traceability
-3. ITPD
+3. **ITPD**
   1. Introduction
     1. Revision history
     2. Purpose and scope
@@ -101,7 +104,7 @@ This is a kind of table of contents of all our documents.
     1. Main server tests
     2. Car tests
     3. Subsystems tests
-4. PP
+4. **PP**
   1. Introduction
     1. Purposes and scope
     2. List of definitios and abbreviations
