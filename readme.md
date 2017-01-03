@@ -23,12 +23,12 @@ Document releases are in the *Releases* directory.
 This is a kind of table of contents of all our documents.
 
 1. RASD
- 1. Introduction
-  1. Description of the given problem
-  2. Goals
-  3. Domain properties
-  4. Glossary
-  5. Text assumptions
+  1. Introduction
+    1. Description of the given problem
+    2. Goals
+    3. Domain properties
+    4. Glossary
+    5. Text assumptions
 ....6. Constraints
 ....7. Proposed system
 ....8. Identifying stakeholders
