@@ -8,6 +8,7 @@ We are to develop a digital managemnet system for a car-sharing service that exc
 The complete problem description can be found in *Assignments AA 2016-2017.pdf*.
 
 The project includes five assignments:
+
 1. RASD: Requirement Analisys and Specification Document
 2. DD: Design Document
 3. ITPD: Integration Test Plan Document
@@ -22,12 +23,12 @@ Document releases are in the *Releases* directory.
 This is a kind of table of contents of all our documents.
 
 1. RASD
-⋅⋅1. Introduction
-⋅⋅⋅⋅1. Description of the given problem
-....2. Goals
-....3. Domain properties
-....4. Glossary
-....5. Text assumptions
+ 1. Introduction
+  1. Description of the given problem
+  2. Goals
+  3. Domain properties
+  4. Glossary
+  5. Text assumptions
 ....6. Constraints
 ....7. Proposed system
 ....8. Identifying stakeholders
